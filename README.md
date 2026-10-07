@@ -80,6 +80,27 @@ La **primera ejecución descarga el modelo (~1.6 GB)**; después funciona sin in
 | `--sobrescribir` | Rehacer transcripciones aunque el `.txt` ya exista. |
 | `-m`, `--modelo` | Otro modelo de Hugging Face en formato MLX. |
 
+## Versión para la nube / Linux (en paralelo)
+
+`transcribir_nube.py` hace lo mismo pero con [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper), que corre en cualquier Linux (CPU o GPU NVIDIA) y transcribe **varios archivos a la vez**.
+
+```bash
+sudo apt install ffmpeg
+pip install -r requirements-nube.txt
+python transcribir_nube.py clases/ --trabajos 4 --salida out/
+python transcribir_nube.py clases/ --dispositivo cuda --tipo float16   # con GPU
+```
+
+Acepta las mismas opciones que la versión local (`-l`, `-s`, `-t`, `--prompt`, `--sobrescribir`) más:
+
+| Opción | Descripción |
+|---|---|
+| `-j`, `--trabajos` | Archivos en paralelo (por defecto, la mitad de los núcleos). Cada proceso carga su copia del modelo y recibe `núcleos / trabajos` hilos. |
+| `--dispositivo` | `cpu` (por defecto) o `cuda`. |
+| `--tipo` | Precisión: `int8` en CPU, `float16` en GPU por defecto. |
+
+`transcribir.py` (Mac, mlx-whisper) y `transcribir_nube.py` comparten las funciones de `comun.py`; ambos deben estar en la misma carpeta.
+
 ## Notas
 
 - **Modelo:** se usa `mlx-community/whisper-large-v3-turbo`, que es `openai/whisper-large-v3-turbo` ya convertido al formato MLX. El repositorio original de OpenAI está en formato PyTorch y `mlx-whisper` no lo carga directamente.
