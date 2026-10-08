@@ -30,6 +30,7 @@ def main() -> int:
     ap.add_argument("-m", "--modelo", default=MODELO_POR_DEFECTO, help=f"Modelo HF (default: {MODELO_POR_DEFECTO})")
     ap.add_argument("-s", "--salida", help="Carpeta donde guardar los .txt (default: junto al audio)")
     ap.add_argument("-t", "--timestamps", action="store_true", help="Una línea por segmento con marca de tiempo")
+    ap.add_argument("-p", "--tiempos-parrafo", action="store_true", help="Párrafos con la hora de inicio al comienzo, p. ej. [15:00]")
     ap.add_argument("--prompt", default=PROMPT_MEDICINA, help="Texto de contexto/vocabulario (usa '' para desactivar)")
     ap.add_argument("--sobrescribir", action="store_true", help="Rehacer aunque el .txt ya exista")
     args = ap.parse_args()
@@ -77,7 +78,7 @@ def main() -> int:
             fallidos += 1
             continue
 
-        destino.write_text(construir_texto(resultado, audio, args.timestamps), encoding="utf-8")
+        destino.write_text(construir_texto(resultado, audio, args.timestamps, args.tiempos_parrafo), encoding="utf-8")
         print(f"  Guardado: {destino}  ({formatear_tiempo(time.time() - inicio)})")
 
     return 1 if fallidos else 0

@@ -32,7 +32,7 @@ def _iniciar_trabajador(nombre, dispositivo, tipo, hilos):
     _modelo = WhisperModel(nombre, device=dispositivo, compute_type=tipo, cpu_threads=hilos)
 
 
-def _transcribir(audio: str, idioma, prompt, timestamps: bool, destino: str) -> tuple[str, float]:
+def _transcribir(audio: str, idioma, prompt, timestamps: bool, tiempos_parrafo: bool, destino: str) -> tuple[str, float]:
     inicio = time.time()
     segmentos, info = _modelo.transcribe(
         audio,
@@ -43,7 +43,7 @@ def _transcribir(audio: str, idioma, prompt, timestamps: bool, destino: str) -> 
     )
     lista = [{"start": s.start, "end": s.end, "text": s.text} for s in segmentos]
     resultado = {"language": info.language, "segments": lista, "text": " ".join(s["text"].strip() for s in lista)}
-    Path(destino).write_text(construir_texto(resultado, Path(audio), timestamps), encoding="utf-8")
+    Path(destino).write_text(construir_texto(resultado, Path(audio), timestamps, tiempos_parrafo), encoding="utf-8")
     return destino, time.time() - inicio
 
 
@@ -55,6 +55,7 @@ def main() -> int:
     ap.add_argument("-m", "--modelo", default=MODELO_POR_DEFECTO, help=f"Modelo faster-whisper (default: {MODELO_POR_DEFECTO})")
     ap.add_argument("-s", "--salida", help="Carpeta donde guardar los .txt (default: junto al audio)")
     ap.add_argument("-t", "--timestamps", action="store_true", help="Una línea por segmento con marca de tiempo")
+    ap.add_argument("-p", "--tiempos-parrafo", action="store_true", help="Párrafos con la hora de inicio al comienzo, p. ej. [15:00]")
     ap.add_argument("--prompt", default=PROMPT_MEDICINA, help="Texto de contexto/vocabulario (usa '' para desactivar)")
     ap.add_argument("--sobrescribir", action="store_true", help="Rehacer aunque el .txt ya exista")
     ap.add_argument("-j", "--trabajos", type=int, default=max(1, nucleos // 2),
@@ -108,7 +109,7 @@ def main() -> int:
         initargs=(args.modelo, args.dispositivo, tipo, hilos),
     ) as pool:
         futuros = {
-            pool.submit(_transcribir, str(a), idioma, args.prompt or None, args.timestamps, str(d)): a
+            pool.submit(_transcribir, str(a), idioma, args.prompt or None, args.timestamps, args.tiempos_parrafo, str(d)): a
             for a, d in pendientes
         }
         for n, fut in enumerate(as_completed(futuros), 1):

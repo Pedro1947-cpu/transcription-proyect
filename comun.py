@@ -31,9 +31,12 @@ def recopilar_audios(entradas: list[str]) -> list[Path]:
     return audios
 
 
-def a_parrafos(segmentos: list[dict], pausa: float = 1.5, max_chars: int = 600) -> list[str]:
-    """Agrupa segmentos en párrafos: nuevo párrafo tras una pausa larga o texto muy largo."""
-    parrafos, actual, fin_previo = [], "", None
+def a_parrafos_con_tiempo(segmentos: list[dict], pausa: float = 1.5, max_chars: int = 600) -> list[tuple[float, str]]:
+    """Agrupa segmentos en párrafos: nuevo párrafo tras una pausa larga o texto muy largo.
+
+    Devuelve (inicio_en_segundos, texto) por párrafo.
+    """
+    parrafos, actual, inicio, fin_previo = [], "", 0.0, None
     for seg in segmentos:
         texto = seg["text"].strip()
         if not texto:
@@ -42,16 +45,29 @@ def a_parrafos(segmentos: list[dict], pausa: float = 1.5, max_chars: int = 600) 
             (fin_previo is not None and seg["start"] - fin_previo >= pausa)
             or (len(actual) >= max_chars and actual.endswith((".", "?", "!")))
         ):
-            parrafos.append(actual)
+            parrafos.append((inicio, actual))
             actual = ""
+        if not actual:
+            inicio = seg["start"]
         actual = f"{actual} {texto}".strip()
         fin_previo = seg["end"]
     if actual:
-        parrafos.append(actual)
+        parrafos.append((inicio, actual))
     return parrafos
 
 
-def construir_texto(resultado: dict, audio: Path, timestamps: bool) -> str:
+def a_parrafos(segmentos: list[dict], pausa: float = 1.5, max_chars: int = 600) -> list[str]:
+    return [texto for _, texto in a_parrafos_con_tiempo(segmentos, pausa, max_chars)]
+
+
+def formatear_minutos(segundos: float) -> str:
+    """MM:SS (p. ej. 15:00); H:MM:SS si pasa de una hora."""
+    s = int(segundos)
+    h, m, sec = s // 3600, (s % 3600) // 60, s % 60
+    return f"{h}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
+
+
+def construir_texto(resultado: dict, audio: Path, timestamps: bool, tiempos_parrafo: bool = False) -> str:
     cabecera = [
         f"Transcripción de: {audio.name}",
         f"Idioma detectado: {resultado.get('language', '?')}",
@@ -60,7 +76,10 @@ def construir_texto(resultado: dict, audio: Path, timestamps: bool) -> str:
         "",
     ]
     segmentos = resultado.get("segments", [])
-    if timestamps:
+    if tiempos_parrafo:
+        cuerpo = [f"[{formatear_minutos(t)}] {p}" for t, p in a_parrafos_con_tiempo(segmentos)]
+        separador = "\n\n"
+    elif timestamps:
         cuerpo = [f"[{formatear_tiempo(s['start'])}] {s['text'].strip()}" for s in segmentos]
         separador = "\n"
     else:
