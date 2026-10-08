@@ -16,73 +16,11 @@ import sys
 import time
 from pathlib import Path
 
-EXTENSIONES = {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".aac", ".mp4", ".mov", ".mkv", ".webm"}
+from comun import PROMPT_MEDICINA, construir_texto, formatear_tiempo, recopilar_audios, ruta_destino
 
 # Versión de openai/whisper-large-v3-turbo ya convertida al formato MLX.
 # (El repo original de openai está en formato PyTorch y mlx-whisper no lo carga directo.)
 MODELO_POR_DEFECTO = "mlx-community/whisper-large-v3-turbo"
-
-# Un prompt con vocabulario ayuda a que Whisper acierte términos técnicos.
-PROMPT_MEDICINA = (
-    "Clase de medicina. Terminología médica: fisiopatología, farmacocinética, "
-    "anatomía, histología, semiología, diagnóstico diferencial, etiología."
-)
-
-
-def formatear_tiempo(segundos: float) -> str:
-    s = int(segundos)
-    return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
-
-
-def recopilar_audios(entradas: list[str]) -> list[Path]:
-    audios: list[Path] = []
-    for entrada in entradas:
-        ruta = Path(entrada).expanduser()
-        if ruta.is_dir():
-            audios += sorted(p for p in ruta.rglob("*") if p.suffix.lower() in EXTENSIONES)
-        elif ruta.is_file():
-            audios.append(ruta)
-        else:
-            print(f"[aviso] No existe: {ruta}", file=sys.stderr)
-    return audios
-
-
-def a_parrafos(segmentos: list[dict], pausa: float = 1.5, max_chars: int = 600) -> list[str]:
-    """Agrupa segmentos en párrafos: nuevo párrafo tras una pausa larga o texto muy largo."""
-    parrafos, actual, fin_previo = [], "", None
-    for seg in segmentos:
-        texto = seg["text"].strip()
-        if not texto:
-            continue
-        if actual and (
-            (fin_previo is not None and seg["start"] - fin_previo >= pausa)
-            or (len(actual) >= max_chars and actual.endswith((".", "?", "!")))
-        ):
-            parrafos.append(actual)
-            actual = ""
-        actual = f"{actual} {texto}".strip()
-        fin_previo = seg["end"]
-    if actual:
-        parrafos.append(actual)
-    return parrafos
-
-
-def construir_texto(resultado: dict, audio: Path, timestamps: bool) -> str:
-    cabecera = [
-        f"Transcripción de: {audio.name}",
-        f"Idioma detectado: {resultado.get('language', '?')}",
-        f"Fecha: {time.strftime('%Y-%m-%d %H:%M')}",
-        "=" * 60,
-        "",
-    ]
-    segmentos = resultado.get("segments", [])
-    if timestamps:
-        cuerpo = [f"[{formatear_tiempo(s['start'])}] {s['text'].strip()}" for s in segmentos]
-        separador = "\n"
-    else:
-        cuerpo = a_parrafos(segmentos) or [resultado.get("text", "").strip()]
-        separador = "\n\n"
-    return "\n".join(cabecera) + separador.join(cuerpo) + "\n"
 
 
 def main() -> int:
@@ -92,6 +30,7 @@ def main() -> int:
     ap.add_argument("-m", "--modelo", default=MODELO_POR_DEFECTO, help=f"Modelo HF (default: {MODELO_POR_DEFECTO})")
     ap.add_argument("-s", "--salida", help="Carpeta donde guardar los .txt (default: junto al audio)")
     ap.add_argument("-t", "--timestamps", action="store_true", help="Una línea por segmento con marca de tiempo")
+    ap.add_argument("-p", "--tiempos-parrafo", action="store_true", help="Párrafos con la hora de inicio al comienzo, p. ej. [15:00]")
     ap.add_argument("--prompt", default=PROMPT_MEDICINA, help="Texto de contexto/vocabulario (usa '' para desactivar)")
     ap.add_argument("--sobrescribir", action="store_true", help="Rehacer aunque el .txt ya exista")
     args = ap.parse_args()
@@ -117,7 +56,7 @@ def main() -> int:
 
     fallidos = 0
     for i, audio in enumerate(audios, 1):
-        destino = (carpeta_salida or audio.parent) / f"{audio.stem}.txt"
+        destino = ruta_destino(audio, carpeta_salida)
         print(f"\n[{i}/{len(audios)}] {audio.name}")
         if destino.exists() and not args.sobrescribir:
             print(f"  Ya existe {destino.name}, se omite (usa --sobrescribir para rehacer).")
@@ -139,7 +78,7 @@ def main() -> int:
             fallidos += 1
             continue
 
-        destino.write_text(construir_texto(resultado, audio, args.timestamps), encoding="utf-8")
+        destino.write_text(construir_texto(resultado, audio, args.timestamps, args.tiempos_parrafo), encoding="utf-8")
         print(f"  Guardado: {destino}  ({formatear_tiempo(time.time() - inicio)})")
 
     return 1 if fallidos else 0
