@@ -80,6 +80,31 @@ La **primera ejecución descarga el modelo (~1.6 GB)**; después funciona sin in
 | `--sobrescribir` | Rehacer transcripciones aunque el `.txt` ya exista. |
 | `-m`, `--modelo` | Otro modelo de Hugging Face en formato MLX. |
 
+## Transcripción automática de las grabaciones de clase
+
+`vigilar.py` revisa cada 5 minutos las carpetas **«Grabaciones»** que la app grabadora llena en Drive (`Medicina 1º/<Asignatura>/Grabaciones`). Cuando aparece un audio nuevo sin `.txt`:
+
+1. te avisa con una notificación del Mac («Nueva grabación · Asignatura»),
+2. lo transcribe en local, sin gastar tokens,
+3. guarda el `.txt` junto al audio (Drive lo sube solo) y avisa «Transcripción lista».
+
+### Ponerlo en marcha (una vez)
+
+1. Instala [Google Drive para escritorio](https://www.google.com/drive/download/) e inicia sesión con tu cuenta. La carpeta «Medicina 1º» debe verse en Finder, en *Google Drive › Mi unidad*.
+2. Haz la instalación de arriba (pasos 1 a 5) si aún no la tienes.
+3. En la Terminal, dentro de la carpeta del proyecto:
+   ```bash
+   ./instalar-vigilante.sh
+   ```
+   Si macOS pregunta si Python puede acceder a archivos de Google Drive, o pide permiso para notificaciones, acepta.
+
+Listo: desde ahora funciona solo, también tras reiniciar el Mac (si el Mac está dormido, lo hace al despertarlo).
+
+- Ver qué ha hecho: `tail -f ~/Library/Logs/transcriptor.log`
+- Probar sin esperar: `source .venv/bin/activate && python vigilar.py`
+- Desinstalar: `./instalar-vigilante.sh quitar`
+- Un audio que falla 3 veces se deja de intentar; para reintentarlo, borra `~/.transcriptor-fallidos.json`.
+
 ## Notas
 
 - **Modelo:** se usa `mlx-community/whisper-large-v3-turbo`, que es `openai/whisper-large-v3-turbo` ya convertido al formato MLX. El repositorio original de OpenAI está en formato PyTorch y `mlx-whisper` no lo carga directamente.
