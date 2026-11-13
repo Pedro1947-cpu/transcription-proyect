@@ -82,7 +82,7 @@ La **primera ejecución descarga el modelo (~1.6 GB)**; después funciona sin in
 
 ## Transcripción automática de las grabaciones de clase
 
-`vigilar.py` revisa cada 5 minutos las carpetas **«Grabaciones»** que la app grabadora llena en Drive (`Medicina 1º/<Asignatura>/Grabaciones`). Cuando aparece un audio nuevo sin `.txt`:
+`vigilar.py` revisa cada 5 minutos las carpetas **«Grabaciones»** que la app grabadora llena en Drive (`Medicina 1º/<Asignatura>/Grabaciones`) y la carpeta **«Grabaciones de clase»**, donde caen las grabaciones que no encajan con ninguna asignatura. Cuando aparece un audio nuevo sin `.txt`:
 
 1. te avisa con una notificación del Mac («Nueva grabación · Asignatura»),
 2. lo transcribe en local, sin gastar tokens,

@@ -5,7 +5,8 @@ Pensado para la app grabadora: los audios se suben a Drive en
 «Medicina 1º/<Asignatura>/Grabaciones». Con Google Drive para escritorio,
 esa carpeta aparece en el Mac, y este script:
 
-  1. busca audios dentro de cualquier carpeta «Grabaciones» que aún no tengan .txt,
+  1. busca audios sin .txt en cualquier carpeta «Grabaciones» y en
+     «Grabaciones de clase» (donde caen las grabaciones sin asignatura),
   2. avisa con una notificación del Mac,
   3. los transcribe en local (mlx-whisper, sin gastar tokens),
   4. guarda el .txt junto al audio (Drive lo sube solo) y vuelve a avisar.
@@ -24,6 +25,8 @@ from transcribir import EXTENSIONES, MODELO_POR_DEFECTO, PROMPT_MEDICINA, constr
 
 CARPETA_RAIZ = "Medicina 1º"
 SUBCARPETA = "Grabaciones"
+# Donde la app deja las grabaciones que no encajan con ninguna asignatura (raíz del Drive).
+CARPETA_SUELTAS = "Grabaciones de clase"
 # Un audio que falla se reintenta como mucho estas veces (para no atascarse).
 MAX_INTENTOS = 3
 ESTADO = Path.home() / ".transcriptor-fallidos.json"
@@ -44,15 +47,19 @@ def avisar(titulo: str, texto: str) -> None:
     subprocess.run(["osascript", "-e", script], check=False, capture_output=True)
 
 
+def es_pendiente(p: Path) -> bool:
+    return p.is_file() and p.suffix.lower() in EXTENSIONES and not p.name.startswith(".") \
+        and not p.with_suffix(".txt").exists()
+
+
 def pendientes(raiz: Path) -> list[Path]:
     audios = []
     for carpeta in raiz.rglob(SUBCARPETA):
-        if not carpeta.is_dir():
-            continue
-        for p in carpeta.iterdir():
-            if p.suffix.lower() in EXTENSIONES and not p.name.startswith(".") \
-                    and not p.with_suffix(".txt").exists():
-                audios.append(p)
+        if carpeta.is_dir():
+            audios += [p for p in carpeta.iterdir() if es_pendiente(p)]
+    sueltas = raiz.parent / CARPETA_SUELTAS
+    if sueltas.is_dir():
+        audios += [p for p in sueltas.rglob("*") if es_pendiente(p)]
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
 
@@ -87,7 +94,7 @@ def main() -> int:
     for audio in cola:
         if not subida_completa(audio):
             continue
-        asignatura = audio.parent.parent.name
+        asignatura = audio.parent.parent.name if audio.parent.name == SUBCARPETA else audio.parent.name
         print(time.strftime("%Y-%m-%d %H:%M"), "Nuevo audio:", audio, flush=True)
         avisar(f"Nueva grabación · {asignatura}", f"Transcribiendo {audio.stem}…")
         inicio = time.time()
