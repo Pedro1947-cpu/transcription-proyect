@@ -59,7 +59,7 @@ def avisar(titulo: str, texto: str) -> None:
 
 def es_pendiente(p: Path) -> bool:
     return p.is_file() and p.suffix.lower() in EXTENSIONES and not p.name.startswith(".") \
-        and not p.with_suffix(".txt").exists()
+        and not p.with_suffix(".txt").exists() and not p.with_suffix(".gdoc").exists()
 
 
 def pendientes(carpetas: list[Path]) -> list[Path]:
