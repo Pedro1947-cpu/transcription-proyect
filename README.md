@@ -90,7 +90,7 @@ La **primera ejecución descarga el modelo (~1.6 GB)**; después funciona sin in
 
 ### Ponerlo en marcha (una vez)
 
-1. Instala [Google Drive para escritorio](https://www.google.com/drive/download/) e inicia sesión con tu cuenta. La carpeta «Medicina 1º» debe verse en Finder, en *Google Drive › Mi unidad*.
+1. Instala [Google Drive para escritorio](https://www.google.com/drive/download/). La carpeta «Medicina 1º» **a la que sube la app** tiene que verse en Finder. Si es de otra cuenta tuya, añade esa cuenta en Drive para escritorio (Ajustes › Añadir otra cuenta), o en drive.google.com › *Compartido conmigo* › clic derecho › *Organizar › Añadir acceso directo* a Mi unidad. Compruébalo con `python vigilar.py --ver`.
 2. Haz la instalación de arriba (pasos 1 a 5) si aún no la tienes.
 3. En la Terminal, dentro de la carpeta del proyecto:
    ```bash

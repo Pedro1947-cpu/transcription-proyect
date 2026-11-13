@@ -12,7 +12,8 @@ esa carpeta aparece en el Mac, y este script:
   4. guarda el .txt junto al audio (Drive lo sube solo) y vuelve a avisar.
 
 Lo lanza macOS cada 5 minutos (ver instalar-vigilante.sh). También se puede
-ejecutar a mano:  python vigilar.py  [carpeta]
+ejecutar a mano:  python vigilar.py  [carpetas...]   (sin carpetas: las busca solo)
+  python vigilar.py --ver            (solo enseña qué carpetas vigila)
 """
 
 import json
@@ -32,11 +33,20 @@ MAX_INTENTOS = 3
 ESTADO = Path.home() / ".transcriptor-fallidos.json"
 
 
-def buscar_raiz() -> Path | None:
-    """Encuentra «Medicina 1º» dentro de Google Drive para escritorio."""
+def buscar_carpetas() -> list[Path]:
+    """Todas las «Medicina 1º» y «Grabaciones de clase» de Google Drive para escritorio.
+
+    Mira todas las cuentas conectadas y también las carpetas compartidas contigo
+    que tengan un acceso directo en «Mi unidad».
+    """
     nube = Path.home() / "Library" / "CloudStorage"
-    candidatos = sorted(nube.glob(f"GoogleDrive-*/*/{CARPETA_RAIZ}"))
-    return candidatos[0] if candidatos else None
+    encontradas = []
+    for nombre in (CARPETA_RAIZ, CARPETA_SUELTAS):
+        encontradas += [p for p in nube.glob(f"GoogleDrive-*/*/{nombre}*") if p.is_dir()]
+        # Carpetas «Compartido conmigo» con acceso directo: Drive las guarda aquí.
+        encontradas += [p for p in nube.glob(f"GoogleDrive-*/.shortcut-targets-by-id/*/{nombre}*")
+                        if p.is_dir()]
+    return sorted(set(encontradas))
 
 
 def avisar(titulo: str, texto: str) -> None:
@@ -52,14 +62,15 @@ def es_pendiente(p: Path) -> bool:
         and not p.with_suffix(".txt").exists()
 
 
-def pendientes(raiz: Path) -> list[Path]:
-    audios = []
-    for carpeta in raiz.rglob(SUBCARPETA):
-        if carpeta.is_dir():
-            audios += [p for p in carpeta.iterdir() if es_pendiente(p)]
-    sueltas = raiz.parent / CARPETA_SUELTAS
-    if sueltas.is_dir():
-        audios += [p for p in sueltas.rglob("*") if es_pendiente(p)]
+def pendientes(carpetas: list[Path]) -> list[Path]:
+    audios = set()
+    for raiz in carpetas:
+        if raiz.name.startswith(CARPETA_SUELTAS):
+            audios.update(p for p in raiz.rglob("*") if es_pendiente(p))
+        else:
+            for carpeta in raiz.rglob(SUBCARPETA):
+                if carpeta.is_dir():
+                    audios.update(p for p in carpeta.iterdir() if es_pendiente(p))
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
 
@@ -74,9 +85,14 @@ def subida_completa(audio: Path) -> bool:
 
 
 def main() -> int:
-    raiz = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else buscar_raiz()
-    if not raiz or not raiz.is_dir():
-        print(f"No encuentro la carpeta «{CARPETA_RAIZ}» de Google Drive. "
+    if sys.argv[1:] == ["--ver"]:
+        for c in buscar_carpetas():
+            print(c)
+        return 0
+    carpetas = [Path(a).expanduser() for a in sys.argv[1:]] or buscar_carpetas()
+    carpetas = [c for c in carpetas if c.is_dir()]
+    if not carpetas:
+        print(f"No encuentro la carpeta «{CARPETA_RAIZ}» en Google Drive. "
               "¿Está abierto Google Drive para escritorio?", file=sys.stderr)
         return 1
 
@@ -85,7 +101,7 @@ def main() -> int:
     except (FileNotFoundError, ValueError):
         fallidos = {}
 
-    cola = [a for a in pendientes(raiz) if fallidos.get(str(a), 0) < MAX_INTENTOS]
+    cola = [a for a in pendientes(carpetas) if fallidos.get(str(a), 0) < MAX_INTENTOS]
     if not cola:
         return 0
 
