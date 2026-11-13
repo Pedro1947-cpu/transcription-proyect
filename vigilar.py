@@ -5,8 +5,8 @@ Pensado para la app grabadora: los audios se suben a Drive en
 «Medicina 1º/<Asignatura>/Grabaciones». Con Google Drive para escritorio,
 esa carpeta aparece en el Mac, y este script:
 
-  1. busca audios sin .txt en cualquier carpeta «Grabaciones» y en
-     «Grabaciones de clase» (donde caen las grabaciones sin asignatura),
+  1. busca audios nuevos de la app (sin .txt ni Google Doc al lado) en las
+     asignaturas de «Medicina 1º» y en «Grabaciones de clase»,
   2. avisa con una notificación del Mac,
   3. los transcribe en local (mlx-whisper, sin gastar tokens),
   4. guarda el .txt junto al audio (Drive lo sube solo) y vuelve a avisar.
@@ -17,6 +17,7 @@ ejecutar a mano:  python vigilar.py  [carpetas...]   (sin carpetas: las busca so
 """
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -30,6 +31,9 @@ SUBCARPETA = "Grabaciones"
 CARPETA_SUELTAS = "Grabaciones de clase"
 # Un audio que falla se reintenta como mucho estas veces (para no atascarse).
 MAX_INTENTOS = 3
+# Nombre que pone la app: «Bioquímica Básica 2026-11-16 (lunes) 09h00.m4a».
+# Así los audios antiguos subidos a mano se quedan como están.
+NOMBRE_APP = re.compile(r"\d{4}-\d{2}-\d{2} \(\w+\) \d{2}h\d{2}")
 ESTADO = Path.home() / ".transcriptor-fallidos.json"
 
 
@@ -65,12 +69,14 @@ def es_pendiente(p: Path) -> bool:
 def pendientes(carpetas: list[Path]) -> list[Path]:
     audios = set()
     for raiz in carpetas:
-        if raiz.name.startswith(CARPETA_SUELTAS):
-            audios.update(p for p in raiz.rglob("*") if es_pendiente(p))
-        else:
-            for carpeta in raiz.rglob(SUBCARPETA):
-                if carpeta.is_dir():
-                    audios.update(p for p in carpeta.iterdir() if es_pendiente(p))
+        for p in raiz.rglob("*"):
+            if not es_pendiente(p):
+                continue
+            # En «Grabaciones de clase» o en una carpeta «Grabaciones», todo es nuevo;
+            # en el resto de «Medicina 1º», solo lo que tenga el nombre de la app.
+            if raiz.name.startswith(CARPETA_SUELTAS) or p.parent.name == SUBCARPETA \
+                    or NOMBRE_APP.search(p.stem):
+                audios.add(p)
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
 
@@ -110,7 +116,7 @@ def main() -> int:
     for audio in cola:
         if not subida_completa(audio):
             continue
-        asignatura = audio.parent.parent.name if audio.parent.name == SUBCARPETA else audio.parent.name
+        asignatura = (audio.parent.parent if audio.parent.name == SUBCARPETA else audio.parent).name.strip()
         print(time.strftime("%Y-%m-%d %H:%M"), "Nuevo audio:", audio, flush=True)
         avisar(f"Nueva grabación · {asignatura}", f"Transcribiendo {audio.stem}…")
         inicio = time.time()
