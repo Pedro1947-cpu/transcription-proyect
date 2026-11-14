@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import time
+import unicodedata
 from pathlib import Path
 
 from transcribir import EXTENSIONES, MODELO_POR_DEFECTO, PROMPT_MEDICINA, construir_texto
@@ -35,7 +36,7 @@ CARPETA_SUELTAS = "Grabaciones de clase"
 MAX_INTENTOS = 3
 # Nombre que pone la app: «Bioquímica Básica 2026-11-16 (lunes) 09h00.m4a».
 # Así los audios antiguos subidos a mano se quedan como están.
-NOMBRE_APP = re.compile(r"\d{4}-\d{2}-\d{2} \(\w+\) \d{2}h\d{2}")
+NOMBRE_APP = re.compile(r"\d{4}-\d{2}-\d{2} \([^)]+\) \d{2}h\d{2}")
 ESTADO = Path.home() / ".transcriptor-fallidos.json"
 
 
@@ -86,7 +87,7 @@ def pendientes(carpetas: list[Path]) -> list[Path]:
                 # En «Grabaciones de clase» o en una carpeta «Grabaciones», todo es nuevo;
                 # en el resto de «Medicina 1º», solo lo que tenga el nombre de la app.
                 if raiz.name.startswith(CARPETA_SUELTAS) or p.parent.name == SUBCARPETA \
-                        or NOMBRE_APP.search(p.stem):
+                        or NOMBRE_APP.search(unicodedata.normalize("NFC", p.stem)):
                     audios.add(p)
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
