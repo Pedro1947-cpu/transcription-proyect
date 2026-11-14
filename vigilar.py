@@ -16,6 +16,7 @@ ejecutar a mano:  python vigilar.py  [carpetas...]   (sin carpetas: las busca so
   python vigilar.py --ver            (solo enseña qué carpetas vigila)
 """
 
+import ctypes
 import json
 import re
 import subprocess
@@ -80,6 +81,26 @@ def pendientes(carpetas: list[Path]) -> list[Path]:
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
 
+def permitir_descargas_de_drive() -> None:
+    """Deja que este proceso (y ffmpeg, que hereda la política) baje audios «solo en la nube».
+
+    Sin esto, un proceso lanzado por launchd que abre un archivo de Drive no
+    descargado recibe «Resource deadlock avoided».
+    """
+    try:
+        # setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, ON)
+        ctypes.CDLL(None).setiopolicy_np(3, 0, 2)
+    except (OSError, AttributeError):
+        pass
+
+
+def descargar(audio: Path) -> None:
+    """Lee el archivo entero para que Drive lo baje antes de pasárselo a ffmpeg."""
+    with open(audio, "rb") as f:
+        while f.read(1 << 20):
+            pass
+
+
 def subida_completa(audio: Path) -> bool:
     """True si el tamaño no cambia en 10 s (Drive ya terminó de copiarlo)."""
     try:
@@ -111,6 +132,7 @@ def main() -> int:
     if not cola:
         return 0
 
+    permitir_descargas_de_drive()
     import mlx_whisper  # se importa solo si hay trabajo: así cada revisión es instantánea
 
     for audio in cola:
@@ -121,6 +143,7 @@ def main() -> int:
         avisar(f"Nueva grabación · {asignatura}", f"Transcribiendo {audio.stem}…")
         inicio = time.time()
         try:
+            descargar(audio)
             resultado = mlx_whisper.transcribe(
                 str(audio),
                 path_or_hf_repo=MODELO_POR_DEFECTO,
