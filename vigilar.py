@@ -18,6 +18,7 @@ ejecutar a mano:  python vigilar.py  [carpetas...]   (sin carpetas: las busca so
 
 import ctypes
 import json
+import os
 import re
 import subprocess
 import sys
@@ -46,11 +47,14 @@ def buscar_carpetas() -> list[Path]:
     """
     nube = Path.home() / "Library" / "CloudStorage"
     encontradas = []
-    for nombre in (CARPETA_RAIZ, CARPETA_SUELTAS):
-        encontradas += [p for p in nube.glob(f"GoogleDrive-*/*/{nombre}*") if p.is_dir()]
-        # Carpetas «Compartido conmigo» con acceso directo: Drive las guarda aquí.
-        encontradas += [p for p in nube.glob(f"GoogleDrive-*/.shortcut-targets-by-id/*/{nombre}*")
-                        if p.is_dir()]
+    patrones = [f"GoogleDrive-*/*/{n}*" for n in (CARPETA_RAIZ, CARPETA_SUELTAS)]
+    # Carpetas «Compartido conmigo» con acceso directo: Drive las guarda aquí.
+    patrones += [f"GoogleDrive-*/.shortcut-targets-by-id/*/{n}*" for n in (CARPETA_RAIZ, CARPETA_SUELTAS)]
+    for patron in patrones:
+        try:
+            encontradas += [p for p in nube.glob(patron) if p.is_dir()]
+        except OSError as e:
+            print("  Aviso:", e, file=sys.stderr)
     return sorted(set(encontradas))
 
 
@@ -70,14 +74,20 @@ def es_pendiente(p: Path) -> bool:
 def pendientes(carpetas: list[Path]) -> list[Path]:
     audios = set()
     for raiz in carpetas:
-        for p in raiz.rglob("*"):
-            if not es_pendiente(p):
-                continue
-            # En «Grabaciones de clase» o en una carpeta «Grabaciones», todo es nuevo;
-            # en el resto de «Medicina 1º», solo lo que tenga el nombre de la app.
-            if raiz.name.startswith(CARPETA_SUELTAS) or p.parent.name == SUBCARPETA \
-                    or NOMBRE_APP.search(p.stem):
-                audios.add(p)
+        # os.walk se salta (en vez de abortar) una carpeta que Drive aún no deja leer.
+        for dirpath, _, nombres in os.walk(raiz, onerror=lambda e: print("  Aviso:", e, file=sys.stderr)):
+            for nombre in nombres:
+                p = Path(dirpath) / nombre
+                try:
+                    if not es_pendiente(p):
+                        continue
+                except OSError:
+                    continue
+                # En «Grabaciones de clase» o en una carpeta «Grabaciones», todo es nuevo;
+                # en el resto de «Medicina 1º», solo lo que tenga el nombre de la app.
+                if raiz.name.startswith(CARPETA_SUELTAS) or p.parent.name == SUBCARPETA \
+                        or NOMBRE_APP.search(p.stem):
+                    audios.add(p)
     return sorted(audios, key=lambda p: p.stat().st_mtime)
 
 
@@ -112,6 +122,7 @@ def subida_completa(audio: Path) -> bool:
 
 
 def main() -> int:
+    permitir_descargas_de_drive()  # antes de recorrer Drive: también hace falta para listar carpetas nuevas
     if sys.argv[1:] == ["--ver"]:
         for c in buscar_carpetas():
             print(c)
@@ -132,7 +143,6 @@ def main() -> int:
     if not cola:
         return 0
 
-    permitir_descargas_de_drive()
     import mlx_whisper  # se importa solo si hay trabajo: así cada revisión es instantánea
 
     for audio in cola:
