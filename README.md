@@ -80,6 +80,31 @@ La **primera ejecución descarga el modelo (~1.6 GB)**; después funciona sin in
 | `--sobrescribir` | Rehacer transcripciones aunque el `.txt` ya exista. |
 | `-m`, `--modelo` | Otro modelo de Hugging Face en formato MLX. |
 
+## Transcripción automática de las grabaciones de clase
+
+`vigilar.py` revisa cada 5 minutos la carpeta **«Medicina 1º»** de Drive (y «Grabaciones de clase», si existe) buscando los audios que sube la app grabadora, que se reconocen por su nombre (`Asignatura 2026-11-16 (lunes) 09h00.m4a`). Los audios antiguos subidos a mano no se tocan. Cuando aparece un audio nuevo sin `.txt`:
+
+1. te avisa con una notificación del Mac («Nueva grabación · Asignatura»),
+2. lo transcribe en local, sin gastar tokens,
+3. guarda el `.txt` junto al audio (Drive lo sube solo) y avisa «Transcripción lista».
+
+### Ponerlo en marcha (una vez)
+
+1. Instala [Google Drive para escritorio](https://www.google.com/drive/download/). La carpeta «Medicina 1º» **a la que sube la app** tiene que verse en Finder. Si es de otra cuenta tuya, añade esa cuenta en Drive para escritorio (Ajustes › Añadir otra cuenta), o en drive.google.com › *Compartido conmigo* › clic derecho › *Organizar › Añadir acceso directo* a Mi unidad. Compruébalo con `python vigilar.py --ver`.
+2. Haz la instalación de arriba (pasos 1 a 5) si aún no la tienes.
+3. En la Terminal, dentro de la carpeta del proyecto:
+   ```bash
+   ./instalar-vigilante.sh
+   ```
+   Si macOS pregunta si Python puede acceder a archivos de Google Drive, o pide permiso para notificaciones, acepta.
+
+Listo: desde ahora funciona solo, también tras reiniciar el Mac (si el Mac está dormido, lo hace al despertarlo).
+
+- Ver qué ha hecho: `tail -f ~/Library/Logs/transcriptor.log`
+- Probar sin esperar: `source .venv/bin/activate && python vigilar.py`
+- Desinstalar: `./instalar-vigilante.sh quitar`
+- Un audio que falla 3 veces se deja de intentar; para reintentarlo, borra `~/.transcriptor-fallidos.json`.
+
 ## Notas
 
 - **Modelo:** se usa `mlx-community/whisper-large-v3-turbo`, que es `openai/whisper-large-v3-turbo` ya convertido al formato MLX. El repositorio original de OpenAI está en formato PyTorch y `mlx-whisper` no lo carga directamente.
