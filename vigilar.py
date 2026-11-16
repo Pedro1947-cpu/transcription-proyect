@@ -89,7 +89,17 @@ def pendientes(carpetas: list[Path]) -> list[Path]:
                 if raiz.name.startswith(CARPETA_SUELTAS) or p.parent.name == SUBCARPETA \
                         or NOMBRE_APP.search(unicodedata.normalize("NFC", p.stem)):
                     audios.add(p)
-    return sorted(audios, key=lambda p: p.stat().st_mtime)
+    return sorted(audios, key=prioridad)
+
+
+def prioridad(audio: Path) -> tuple:
+    """Primero los ensayos, y dentro de cada grupo los más cortos (menos MB)."""
+    es_ensayo = unicodedata.normalize("NFC", audio.name).lower().startswith("ensayo")
+    try:
+        tamano = audio.stat().st_size
+    except OSError:
+        tamano = float("inf")
+    return (not es_ensayo, tamano)
 
 
 def permitir_descargas_de_drive() -> None:
@@ -140,15 +150,21 @@ def main() -> int:
     except (FileNotFoundError, ValueError):
         fallidos = {}
 
-    cola = [a for a in pendientes(carpetas) if fallidos.get(str(a), 0) < MAX_INTENTOS]
-    if not cola:
-        return 0
-
-    import mlx_whisper  # se importa solo si hay trabajo: así cada revisión es instantánea
-
-    for audio in cola:
+    mlx_whisper = None
+    vistos: set[Path] = set()
+    while True:
+        # Se vuelve a mirar Drive tras cada audio: si llega un ensayo corto
+        # mientras se transcribe una clase larga, pasa delante del resto.
+        cola = [a for a in pendientes(carpetas)
+                if a not in vistos and fallidos.get(str(a), 0) < MAX_INTENTOS]
+        if not cola:
+            return 0
+        audio = cola[0]
+        vistos.add(audio)
         if not subida_completa(audio):
             continue
+        if mlx_whisper is None:
+            import mlx_whisper  # solo si hay trabajo: así cada revisión es instantánea
         asignatura = (audio.parent.parent if audio.parent.name == SUBCARPETA else audio.parent).name.strip()
         print(time.strftime("%Y-%m-%d %H:%M"), "Nuevo audio:", audio, flush=True)
         avisar(f"Nueva grabación · {asignatura}", f"Transcribiendo {audio.stem}…")
@@ -174,7 +190,6 @@ def main() -> int:
         minutos = round((time.time() - inicio) / 60)
         print(f"  Listo en {minutos} min", flush=True)
         avisar(f"Transcripción lista · {asignatura}", f"{audio.stem} ({minutos} min)")
-    return 0
 
 
 if __name__ == "__main__":
