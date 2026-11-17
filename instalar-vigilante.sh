@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deja vigilar.py funcionando solo: macOS lo lanza al encender y cada 5 minutos.
+# Deja vigilar.py funcionando solo: macOS lo lanza al encender y cada minuto.
 # Uso:   ./instalar-vigilante.sh            (instalar o actualizar)
 #        ./instalar-vigilante.sh quitar     (desinstalar)
 set -e
@@ -29,7 +29,7 @@ cat > "$PLIST" <<PLIST
   <key>WorkingDirectory</key><string>$PWD</string>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>$FFMPEG_DIR:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
-  <key>StartInterval</key><integer>300</integer>
+  <key>StartInterval</key><integer>60</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
@@ -37,4 +37,4 @@ cat > "$PLIST" <<PLIST
 </plist>
 PLIST
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "Listo. Revisa las grabaciones cada 5 minutos. Registro: $LOG"
+echo "Listo. Revisa las grabaciones cada minuto. Registro: $LOG"

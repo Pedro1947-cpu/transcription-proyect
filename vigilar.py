@@ -11,7 +11,7 @@ esa carpeta aparece en el Mac, y este script:
   3. los transcribe en local (mlx-whisper, sin gastar tokens),
   4. guarda el .txt junto al audio (Drive lo sube solo) y vuelve a avisar.
 
-Lo lanza macOS cada 5 minutos (ver instalar-vigilante.sh). También se puede
+Lo lanza macOS cada minuto (ver instalar-vigilante.sh). También se puede
 ejecutar a mano:  python vigilar.py  [carpetas...]   (sin carpetas: las busca solo)
   python vigilar.py --ver            (solo enseña qué carpetas vigila)
 """
